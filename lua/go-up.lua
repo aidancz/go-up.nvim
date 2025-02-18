@@ -60,6 +60,18 @@ M.extmark_is_valid = function(buffer_handle, n)
 	return true
 end
 
+-- -- prototype
+-- vim.api.nvim_buf_set_extmark(
+-- 	0,
+-- 	vim.api.nvim_create_namespace("test"),
+-- 	0,
+-- 	0,
+-- 	{
+-- 		virt_lines = {{{"", "NonText"}}, {{"", "NonText"}}, {{"", "NonText"}}},
+-- 		virt_lines_above = true,
+-- 	}
+-- )
+
 M.update_extmark = function(buffer_handle, n, force)
 	if
 		force == false
