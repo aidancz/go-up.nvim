@@ -110,7 +110,7 @@ M.create_autocmd = function()
 		{
 			group = M.cache.goup_augroup,
 			callback = function()
-				M.update_extmark(0, vim.api.nvim_win_get_height(0)-1)
+				M.update_extmark(vim.api.nvim_get_current_buf(), vim.api.nvim_win_get_height(0)-1)
 			end,
 		}
 	)
@@ -206,7 +206,7 @@ end
 
 M.redraw = function()
 -- HACK: https://github.com/nullromo/go-up.nvim/issues/9
-	M.update_extmark(0, vim.api.nvim_win_get_height(0)-1, true)
+	M.update_extmark(vim.api.nvim_get_current_buf(), vim.api.nvim_win_get_height(0)-1, true)
 end
 
 -- # return
