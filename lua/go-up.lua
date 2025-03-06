@@ -108,6 +108,7 @@ M.update_extmark = function(buffer_handle, n, force)
 						end
 					)(),
 				virt_lines_above = true,
+				right_gravity = false, -- https://github.com/echasnovski/mini.nvim/issues/1642
 			}
 		)
 end
