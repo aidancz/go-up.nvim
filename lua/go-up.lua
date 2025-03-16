@@ -196,6 +196,8 @@ end
 
 M.align_top = function()
 	M.scroll(M.count_blank_top())
+	vim.cmd("redraw!")
+	-- work with eolmark
 end
 
 M.align_bottom = function()
