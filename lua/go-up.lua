@@ -21,18 +21,10 @@ M.cache = {
 		-- buffer_handle_2 = id_2,
 		-- ...
 	},
-	goup_augroup = vim.api.nvim_create_augroup("goup", {clear = true}),
+	augroup = vim.api.nvim_create_augroup("go-up", {clear = true}),
 }
 
 -- # function: virtual lines
-
-H.get_table_size = function(table)
-	local size = 0
-	for _, _ in pairs(table) do
-		size = size + 1
-	end
-	return size
-end
 
 M.extmark_is_valid = function(buffer_handle, n)
 	if M.cache.extmark_id[buffer_handle] == nil then
@@ -53,7 +45,7 @@ M.extmark_is_valid = function(buffer_handle, n)
 		return false
 	end
 
-	if n ~= H.get_table_size(extmark_info[3].virt_lines) then
+	if n ~= #extmark_info[3].virt_lines then
 		return false
 	end
 
@@ -101,7 +93,7 @@ M.update_extmark = function(buffer_handle, n, force)
 						function()
 							local lines = {}
 							local line = {{"", "NonText"}}
-							for i = 1, n do
+							for _ = 1, n do
 								table.insert(lines, line)
 							end
 							return lines
@@ -121,7 +113,7 @@ M.create_autocmd = function()
 			"TextChangedI",
 		},
 		{
-			group = M.cache.goup_augroup,
+			group = M.cache.augroup,
 			callback = function()
 				M.update_extmark(vim.api.nvim_get_current_buf(), vim.api.nvim_win_get_height(0)-1)
 			end,
@@ -155,18 +147,35 @@ end
 
 M.winscreenrow = function(winid, lnum, col)
 	local screenrow = vim.fn.screenpos(winid, lnum, col).row
-	if screenrow == 0 then
+
+	if screenrow == 0 then return 0 end
 	-- screenrow == 0 means invisible
-		return 0
+
+	local screenrow_win_first_line_with_border = vim.fn.win_screenpos(winid)[1]
+	local screenrow_win_first_line
+	local win_config = vim.api.nvim_win_get_config(winid)
+	if
+		win_config.relative ~= ""
+		-- floating window
+		and
+		(
+			win_config.border ~= nil
+			-- has border
+			and
+			win_config.border[2] ~= ""
+			-- border has top char
+		)
+	then
+		screenrow_win_first_line = screenrow_win_first_line_with_border + 1
 	else
-		local screenrow_win_first_line = vim.fn.win_screenpos(winid)[1]
-		local winscreenrow = screenrow - screenrow_win_first_line + 1
-		return winscreenrow
+		screenrow_win_first_line = screenrow_win_first_line_with_border
 	end
+	local winscreenrow = screenrow - (screenrow_win_first_line - 1)
+	return winscreenrow
 end
 
 M.count_blank_top = function()
-	local winscreenrow_buf_first_line = M.winscreenrow(vim.api.nvim_get_current_win(), 1, 1)
+	local winscreenrow_buf_first_line = M.winscreenrow(0, 1, 1)
 	local winscreenrow_win_first_line = 1
 
 	if winscreenrow_buf_first_line == 0 then
@@ -180,11 +189,7 @@ M.count_blank_bottom = function()
 	local lnum = vim.fn.line("$")
 	local col = vim.fn.col({lnum, "$"})
 
-	local winscreenrow_buf_last_line = M.winscreenrow(
-		vim.api.nvim_get_current_win(),
-		lnum,
-		col
-	)
+	local winscreenrow_buf_last_line = M.winscreenrow(0, lnum, col)
 	local winscreenrow_win_last_line = vim.api.nvim_win_get_height(0)
 
 	if winscreenrow_buf_last_line == 0 then
@@ -196,8 +201,6 @@ end
 
 M.align_top = function()
 	M.scroll(M.count_blank_top())
-	vim.cmd("redraw!")
-	-- work with eolmark
 end
 
 M.align_bottom = function()
@@ -208,13 +211,9 @@ M.align = function()
 	local blank_top = M.count_blank_top()
 	local blank_bottom = M.count_blank_bottom()
 
-	if blank_bottom == 0 then
+	if blank_top ~= 0 then
 		M.align_top()
-	elseif blank_top == 0 then
-		M.align_bottom()
-	elseif blank_top <= blank_bottom then
-		M.align_top()
-	elseif blank_top > blank_bottom then
+	else
 		M.align_bottom()
 	end
 end
