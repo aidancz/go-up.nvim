@@ -159,7 +159,7 @@ M.winscreenrow = function(winid, lnum, col)
 		-- floating window
 		and
 		(
-			win_config.border ~= nil
+			win_config.border ~= "none"
 			-- has border
 			and
 			win_config.border[2] ~= ""
