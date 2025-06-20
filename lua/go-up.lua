@@ -8,7 +8,6 @@ M.config = {
 
 M.setup = function(config)
 	M.config = vim.tbl_deep_extend("force", M.config, config or {})
-	M.set_option()
 	M.create_autocmd()
 end
 
@@ -121,29 +120,39 @@ M.create_autocmd = function()
 	)
 end
 
--- # function: recenter
+-- M.redraw = function()
+-- -- HACK: https://github.com/nullromo/go-up.nvim/issues/9
+-- 	M.update_extmark(vim.api.nvim_get_current_buf(), vim.api.nvim_win_get_height(0)-1, true)
+-- end
 
-M.set_option = function()
-	vim.opt.smoothscroll = true
-end
+-- # function: adjust_view
 
-M.scroll = function(n)
+M.adjust_view = function(n)
+	vim.o.smoothscroll = true
+	-- can't set and restore, don't know why
+
 	if n == 0 then
 		return
 	elseif n > 0 then
 		vim.cmd("normal!" .. n .. "")
 		-- HACK: invisible char here, ascii 5
 	elseif n < 0 then
-		vim.cmd("normal!" .. -n .. "")
+		n = -n
+		vim.cmd("normal!" .. n .. "")
 		-- HACK: invisible char here, ascii 25
 	end
 end
 
-M.new_zz = function()
-	local winscreenrow_target = math.floor(vim.api.nvim_win_get_height(0) / 2)
+-- # function: recenter
+
+M.recenter = function(winscreenrow_target)
+	winscreenrow_target = math.floor(winscreenrow_target)
+	winscreenrow_target = math.max(1, winscreenrow_target)
 	local winscreenrow_current = vim.fn.winline()
-	M.scroll(-(winscreenrow_target - winscreenrow_current))
+	M.adjust_view(-(winscreenrow_target - winscreenrow_current))
 end
+
+-- # function: align
 
 M.winscreenrow = function(winid, lnum, col)
 	local screenrow = vim.fn.screenpos(winid, lnum, col).row
@@ -200,11 +209,11 @@ M.count_blank_bottom = function()
 end
 
 M.align_top = function()
-	M.scroll(M.count_blank_top())
+	M.adjust_view(M.count_blank_top())
 end
 
 M.align_bottom = function()
-	M.scroll(-M.count_blank_bottom())
+	M.adjust_view(-M.count_blank_bottom())
 end
 
 M.align = function()
@@ -218,9 +227,49 @@ M.align = function()
 	end
 end
 
-M.redraw = function()
--- HACK: https://github.com/nullromo/go-up.nvim/issues/9
-	M.update_extmark(vim.api.nvim_get_current_buf(), vim.api.nvim_win_get_height(0)-1, true)
+-- # function: scroll
+
+M.scroll__is_cursor_follow0 = function(n)
+	vim.o.smoothscroll = true
+	if n == 0 then
+		return
+	elseif n > 0 then
+		vim.cmd("normal!" .. n .. "")
+	elseif n < 0 then
+		n = -n
+		vim.cmd("normal!" .. n .. "")
+	end
+end
+
+M.scroll__is_cursor_follow1 = function(n)
+	vim.o.smoothscroll = true
+	if n == 0 then
+		return
+	elseif n > 0 then
+		if M.count_blank_bottom() == 0 then
+			local view = vim.fn.winsaveview()
+			M.scroll__is_cursor_follow0(n)
+			local blank_bottom = M.count_blank_bottom()
+			vim.fn.winrestview(view)
+
+			vim.cmd("normal!" .. n .. "")
+			M.scroll__is_cursor_follow0(blank_bottom)
+		else
+			vim.cmd("normal!" .. n .. "")
+			M.scroll__is_cursor_follow0(n)
+		end
+	elseif n < 0 then
+		n = -n
+		vim.cmd("normal!" .. n .. "")
+	end
+end
+
+M.scroll = function(n, is_cursor_follow)
+	if is_cursor_follow then
+		M.scroll__is_cursor_follow1(n)
+	else
+		M.scroll__is_cursor_follow0(n)
+	end
 end
 
 -- # return
