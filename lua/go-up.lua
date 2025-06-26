@@ -25,32 +25,6 @@ M.cache = {
 
 -- # function: virtual lines
 
-M.extmark_is_valid = function(buffer_handle, n)
-	if M.cache.extmark_id[buffer_handle] == nil then
-		return false
-	end
-
-	local extmark_info =
-		vim.api.nvim_buf_get_extmark_by_id(
-			buffer_handle,
-			M.cache.extmark_ns_id,
-			M.cache.extmark_id[buffer_handle],
-			{
-				details = true,
-			}
-		)
-
-	if extmark_info[1] ~= 0 then
-		return false
-	end
-
-	if n ~= #extmark_info[3].virt_lines then
-		return false
-	end
-
-	return true
-end
-
 -- -- prototype
 -- vim.api.nvim_buf_set_extmark(
 -- 	0,
@@ -62,23 +36,8 @@ end
 -- 		virt_lines_above = true,
 -- 	}
 -- )
-
-M.update_extmark = function(buffer_handle, n, force)
-	if
-		force == false
-		and
-		M.extmark_is_valid(buffer_handle, n)
-	then
-		return
-	end
-
-	if M.cache.extmark_id[buffer_handle] ~= nil then
-		vim.api.nvim_buf_del_extmark(
-			buffer_handle,
-			M.cache.extmark_ns_id,
-			M.cache.extmark_id[buffer_handle]
-		)
-	end
+M.create_extmark = function(buffer_handle, n)
+	if buffer_handle == 0 then buffer_handle = vim.api.nvim_get_current_buf() end
 
 	M.cache.extmark_id[buffer_handle] =
 		vim.api.nvim_buf_set_extmark(
@@ -104,26 +63,92 @@ M.update_extmark = function(buffer_handle, n, force)
 		)
 end
 
+M.del_extmark = function(buffer_handle)
+	if buffer_handle == 0 then buffer_handle = vim.api.nvim_get_current_buf() end
+
+	if M.cache.extmark_id[buffer_handle] ~= nil then
+		vim.api.nvim_buf_del_extmark(
+			buffer_handle,
+			M.cache.extmark_ns_id,
+			M.cache.extmark_id[buffer_handle]
+		)
+	end
+
+	M.cache.extmark_id[buffer_handle] = nil
+end
+
+M.extmark_is_valid = function(buffer_handle, n)
+	if buffer_handle == 0 then buffer_handle = vim.api.nvim_get_current_buf() end
+
+	if M.cache.extmark_id[buffer_handle] == nil then
+		return false
+	end
+
+	local extmark_info =
+		vim.api.nvim_buf_get_extmark_by_id(
+			buffer_handle,
+			M.cache.extmark_ns_id,
+			M.cache.extmark_id[buffer_handle],
+			{
+				details = true,
+			}
+		)
+
+	if extmark_info[1] ~= 0 then
+		return false
+	end
+
+	if n ~= #extmark_info[3].virt_lines then
+		return false
+	end
+
+	return true
+end
+
+M.update_extmark = function(buffer_handle, n)
+	if buffer_handle == 0 then buffer_handle = vim.api.nvim_get_current_buf() end
+
+	if
+		M.extmark_is_valid(buffer_handle, n)
+	then
+		return
+	end
+
+	M.del_extmark(buffer_handle)
+	M.create_extmark(buffer_handle, n)
+end
+
 M.create_autocmd = function()
 	vim.api.nvim_create_autocmd(
 		{
 			"BufEnter",
-			"TextChanged",
-			"TextChangedI",
+			-- "TextChanged",
+			-- "TextChangedI",
 		},
 		{
 			group = M.cache.augroup,
 			callback = function()
-				M.update_extmark(vim.api.nvim_get_current_buf(), vim.api.nvim_win_get_height(0)-1)
+				M.update_extmark(0, vim.o.lines)
 			end,
 		}
 	)
 end
 
--- M.redraw = function()
--- -- HACK: https://github.com/nullromo/go-up.nvim/issues/9
--- 	M.update_extmark(vim.api.nvim_get_current_buf(), vim.api.nvim_win_get_height(0)-1, true)
--- end
+M.toggle = function()
+	if
+		next(
+			vim.api.nvim_get_autocmds({group = M.cache.augroup})
+		) == nil
+	then
+		vim.api.nvim_exec_autocmds("BufEnter", {group = M.cache.augroup})
+		M.create_autocmd()
+	else
+		vim.api.nvim_clear_autocmds({group = M.cache.augroup})
+		for buffer_handle, _ in pairs(M.cache.extmark_id) do
+			M.del_extmark(buffer_handle)
+		end
+	end
+end
 
 -- # function: adjust_view
 
@@ -148,6 +173,7 @@ end
 M.recenter = function(winscreenrow_target)
 	winscreenrow_target = math.floor(winscreenrow_target)
 	winscreenrow_target = math.max(1, winscreenrow_target)
+	winscreenrow_target = math.min(vim.fn.winheight(0), winscreenrow_target)
 	local winscreenrow_current = vim.fn.winline()
 	M.adjust_view(-(winscreenrow_target - winscreenrow_current))
 end
@@ -265,6 +291,7 @@ M.scroll__is_cursor_follow1 = function(n)
 end
 
 M.scroll = function(n, is_cursor_follow)
+	n = math.floor(n)
 	if is_cursor_follow then
 		M.scroll__is_cursor_follow1(n)
 	else
