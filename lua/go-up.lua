@@ -140,8 +140,8 @@ M.toggle = function()
 			vim.api.nvim_get_autocmds({group = M.cache.augroup})
 		) == nil
 	then
-		vim.api.nvim_exec_autocmds("BufEnter", {group = M.cache.augroup})
 		M.create_autocmd()
+		vim.api.nvim_exec_autocmds("BufEnter", {group = M.cache.augroup})
 	else
 		vim.api.nvim_clear_autocmds({group = M.cache.augroup})
 		for buffer_handle, _ in pairs(M.cache.extmark_id) do
