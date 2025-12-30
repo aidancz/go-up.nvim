@@ -1,6 +1,11 @@
 local M = {}
 local H = {}
 
+H.ctrl_e = "\5"
+H.ctrl_y = "\25"
+H.ctrl_d = "\4"
+H.ctrl_u = "\21"
+
 -- # config & setup
 
 M.config = {
@@ -159,12 +164,10 @@ M.adjust_view = function(n)
 	if n == 0 then
 		return
 	elseif n > 0 then
-		vim.cmd("normal!" .. n .. "")
-		-- HACK: invisible char here, ascii 5
+		vim.cmd("normal!" .. n .. H.ctrl_e)
 	elseif n < 0 then
 		n = -n
-		vim.cmd("normal!" .. n .. "")
-		-- HACK: invisible char here, ascii 25
+		vim.cmd("normal!" .. n .. H.ctrl_y)
 	end
 end
 
@@ -260,10 +263,10 @@ M.scroll__is_cursor_follow0 = function(n)
 	if n == 0 then
 		return
 	elseif n > 0 then
-		vim.cmd("normal!" .. n .. "")
+		vim.cmd("normal!" .. n .. H.ctrl_e)
 	elseif n < 0 then
 		n = -n
-		vim.cmd("normal!" .. n .. "")
+		vim.cmd("normal!" .. n .. H.ctrl_y)
 	end
 end
 
@@ -278,15 +281,15 @@ M.scroll__is_cursor_follow1 = function(n)
 			local blank_bottom = M.count_blank_bottom()
 			vim.fn.winrestview(view)
 
-			vim.cmd("normal!" .. n .. "")
+			vim.cmd("normal!" .. n .. H.ctrl_d)
 			M.scroll__is_cursor_follow0(blank_bottom)
 		else
-			vim.cmd("normal!" .. n .. "")
+			vim.cmd("normal!" .. n .. H.ctrl_d)
 			M.scroll__is_cursor_follow0(n)
 		end
 	elseif n < 0 then
 		n = -n
-		vim.cmd("normal!" .. n .. "")
+		vim.cmd("normal!" .. n .. H.ctrl_u)
 	end
 end
 
