@@ -1,11 +1,6 @@
 local M = {}
 local H = {}
 
-H.ctrl_e = "\5"
-H.ctrl_y = "\25"
-H.ctrl_d = "\4"
-H.ctrl_u = "\21"
-
 -- # config & setup
 
 M.config = {
@@ -37,10 +32,12 @@ M.cache = {
 -- 	0,
 -- 	0,
 -- 	{
+-- 		right_gravity = false,
 -- 		virt_lines = {{{"", "NonText"}}, {{"", "NonText"}}, {{"", "NonText"}}},
 -- 		virt_lines_above = true,
 -- 	}
 -- )
+
 M.create_extmark = function(buffer_handle, n)
 	if buffer_handle == 0 then buffer_handle = vim.api.nvim_get_current_buf() end
 
@@ -51,6 +48,7 @@ M.create_extmark = function(buffer_handle, n)
 			0,
 			0,
 			{
+				right_gravity = false, -- https://github.com/echasnovski/mini.nvim/issues/1642
 				virt_lines =
 					(
 						function()
@@ -63,7 +61,6 @@ M.create_extmark = function(buffer_handle, n)
 						end
 					)(),
 				virt_lines_above = true,
-				right_gravity = false, -- https://github.com/echasnovski/mini.nvim/issues/1642
 			}
 		)
 end
@@ -139,11 +136,11 @@ M.create_autocmd = function()
 	)
 end
 
-M.toggle = function()
+M.toggle_autocmd = function()
 	if
-		next(
+		vim.tbl_isempty(
 			vim.api.nvim_get_autocmds({group = M.cache.augroup})
-		) == nil
+		)
 	then
 		M.create_autocmd()
 		vim.api.nvim_exec_autocmds("BufEnter", {group = M.cache.augroup})
@@ -155,19 +152,120 @@ M.toggle = function()
 	end
 end
 
--- # function: adjust_view
+-- # function: scroll
 
-M.adjust_view = function(n)
-	vim.o.smoothscroll = true
-	-- can't set and restore, don't know why
+--[[
+vim does not provide a function for scrolling
+it can scroll only in two ways
 
+1. <c-e> and <c-y>
+the cursor trys to stay at buffer position
+
+2. <c-d> and <c-u>
+the cursor trys to stay at window position
+--]]
+
+M.scroll_ey = function(n)
+	assert(vim.wo.smoothscroll == true) -- can't set and restore, don't know why
 	if n == 0 then
 		return
 	elseif n > 0 then
-		vim.cmd("normal!" .. n .. H.ctrl_e)
+		vim.cmd("normal!" .. n .. vim.keycode("<c-e>"))
 	elseif n < 0 then
 		n = -n
-		vim.cmd("normal!" .. n .. H.ctrl_y)
+		vim.cmd("normal!" .. n .. vim.keycode("<c-y>"))
+	end
+end
+
+M.scroll_du = function(n)
+	assert(vim.wo.smoothscroll == true) -- can't set and restore, don't know why
+	if n == 0 then
+		return
+	elseif n > 0 then
+		vim.cmd("normal!" .. n .. vim.keycode("<c-d>"))
+	elseif n < 0 then
+		n = -n
+		vim.cmd("normal!" .. n .. vim.keycode("<c-u>"))
+	end
+end
+
+--[[
+what i want to achieve is symmetrical scrolling
+which means that after scroll(n) and scroll(-n), the cursor should not move
+scroll_du is very close, but it fails at the beginning/end of the buffer
+we need to modify it slightly
+--]]
+
+M.scroll_count_ctrld_space = function()
+	local pos11_cursor = require("virtcol").get_cursor()
+	local pos00 = {
+		pos11_cursor.lnum - 1,
+		pos11_cursor.virtcol - 1,
+	}
+	local height_info = vim.api.nvim_win_text_height(
+		0,
+		{
+			start_row = pos00[1],
+			start_vcol = pos00[2] + 1, -- exclusive
+		}
+	)
+	local height = height_info.all
+	local space = height - 1
+	local invisible_space = space - (vim.api.nvim_win_get_height(0) - vim.fn.winline())
+	return space, invisible_space
+end
+
+M.scroll_count_ctrlu_space = function()
+	local pos11_cursor = require("virtcol").get_cursor()
+	local pos00 = {
+		pos11_cursor.lnum - 1,
+		pos11_cursor.virtcol - 1,
+	}
+	local height_info = vim.api.nvim_win_text_height(
+		0,
+		{
+			end_row = pos00[1],
+			end_vcol = pos00[2] + 1, -- exclusive
+		}
+	)
+	local height_info_sob = vim.api.nvim_win_text_height(0, {end_row = 0, end_vcol = 0})
+	local height = height_info.all - height_info_sob.all
+	local space = height - 1
+	local invisible_space = space - (vim.fn.winline() - 1)
+	return space, invisible_space
+end
+
+M.scroll_du_fix = function(n)
+	local should_fix = false
+	if n > 0 then
+		local _, invisible_space = M.scroll_count_ctrld_space()
+		if invisible_space <= 0 then
+		-- in this situation, <c-d> only moves the cursor and does not scroll
+			should_fix = true
+		end
+	end
+
+	M.scroll_du(n)
+	if should_fix then M.scroll_ey(n) end
+end
+
+M.scroll = function(n)
+	if n == 0 then
+		return
+	elseif n > 0 then
+		local space, invisible_space = M.scroll_count_ctrld_space()
+		if math.abs(n) <= space then
+			M.scroll_du_fix(n)
+		else
+			M.scroll_ey(0 + invisible_space)
+		end
+	elseif n < 0 then
+		local space, invisible_space = M.scroll_count_ctrlu_space()
+		if math.abs(n) <= space then
+			M.scroll_du_fix(n)
+		else
+			M.scroll_ey(0 - invisible_space)
+		end
 	end
 end
 
@@ -178,10 +276,12 @@ M.recenter = function(winscreenrow_target)
 	winscreenrow_target = math.max(1, winscreenrow_target)
 	winscreenrow_target = math.min(vim.fn.winheight(0), winscreenrow_target)
 	local winscreenrow_current = vim.fn.winline()
-	M.adjust_view(-(winscreenrow_target - winscreenrow_current))
+	M.scroll_ey(-(winscreenrow_target - winscreenrow_current))
 end
 
--- # function: align
+-- # used before
+
+--[[
 
 M.winscreenrow = function(winid, lnum, col)
 	local screenrow = vim.fn.screenpos(winid, lnum, col).row
@@ -193,16 +293,11 @@ M.winscreenrow = function(winid, lnum, col)
 	local screenrow_win_first_line
 	local win_config = vim.api.nvim_win_get_config(winid)
 	if
-		win_config.relative ~= ""
-		-- floating window
+		win_config.relative ~= "" -- floating window
 		and
-		(
-			win_config.border ~= "none"
-			-- has border
-			and
-			win_config.border[2] ~= ""
-			-- border has top char
-		)
+		win_config.border ~= "none" -- has border
+		and
+		win_config.border[2] ~= "" -- border has top char
 	then
 		screenrow_win_first_line = screenrow_win_first_line_with_border + 1
 	else
@@ -223,7 +318,7 @@ M.count_blank_top = function()
 	end
 end
 
-M.count_blank_bottom = function()
+M.count_blank_bot = function()
 	local lnum = vim.fn.line("$")
 	local col = vim.fn.col({lnum, "$"})
 
@@ -241,66 +336,29 @@ M.align_top = function()
 	M.adjust_view(M.count_blank_top())
 end
 
-M.align_bottom = function()
-	M.adjust_view(-M.count_blank_bottom())
+M.align_bot = function()
+	M.adjust_view(-M.count_blank_bot())
 end
 
-M.align = function()
-	local blank_top = M.count_blank_top()
-	local blank_bottom = M.count_blank_bottom()
-
-	if blank_top ~= 0 then
-		M.align_top()
-	else
-		M.align_bottom()
-	end
-end
-
--- # function: scroll
-
-M.scroll__is_cursor_follow0 = function(n)
-	vim.o.smoothscroll = true
+M.scroll_dry_run_count_blank = function(n)
 	if n == 0 then
-		return
+		return 0
 	elseif n > 0 then
-		vim.cmd("normal!" .. n .. H.ctrl_e)
+		local view = vim.fn.winsaveview()
+		M.scroll_ey(n)
+		local blank = M.count_blank_bot()
+		vim.fn.winrestview(view)
+		return blank
 	elseif n < 0 then
-		n = -n
-		vim.cmd("normal!" .. n .. H.ctrl_y)
+		local view = vim.fn.winsaveview()
+		M.scroll_ey(n)
+		local blank = M.count_blank_top()
+		vim.fn.winrestview(view)
+		return blank
 	end
 end
 
-M.scroll__is_cursor_follow1 = function(n)
-	vim.o.smoothscroll = true
-	if n == 0 then
-		return
-	elseif n > 0 then
-		if M.count_blank_bottom() == 0 then
-			local view = vim.fn.winsaveview()
-			M.scroll__is_cursor_follow0(n)
-			local blank_bottom = M.count_blank_bottom()
-			vim.fn.winrestview(view)
-
-			vim.cmd("normal!" .. n .. H.ctrl_d)
-			M.scroll__is_cursor_follow0(blank_bottom)
-		else
-			vim.cmd("normal!" .. n .. H.ctrl_d)
-			M.scroll__is_cursor_follow0(n)
-		end
-	elseif n < 0 then
-		n = -n
-		vim.cmd("normal!" .. n .. H.ctrl_u)
-	end
-end
-
-M.scroll = function(n, is_cursor_follow)
-	n = math.floor(n)
-	if is_cursor_follow then
-		M.scroll__is_cursor_follow1(n)
-	else
-		M.scroll__is_cursor_follow0(n)
-	end
-end
+--]]
 
 -- # return
 
