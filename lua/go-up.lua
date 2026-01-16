@@ -15,11 +15,6 @@ end
 
 M.cache = {
 	extmark_ns_id = vim.api.nvim_create_namespace("go-up"),
-	extmark_id = {
-		-- buffer_handle_1 = id_1,
-		-- buffer_handle_2 = id_2,
-		-- ...
-	},
 	augroup = vim.api.nvim_create_augroup("go-up", {clear = true}),
 }
 
@@ -38,118 +33,86 @@ M.cache = {
 -- 	}
 -- )
 
-M.create_extmark = function(buffer_handle, n)
-	if buffer_handle == 0 then buffer_handle = vim.api.nvim_get_current_buf() end
+M.buf_set_extmark = function(buf, n_lines)
+	local eob = vim.opt.fillchars:get().eob or "~"
+	local hl = "EndOfBuffer"
+	local line = {{eob, hl}}
+	local lines = {}
+	for _ = 1, n_lines do
+		table.insert(lines, line)
+	end
 
-	M.cache.extmark_id[buffer_handle] =
-		vim.api.nvim_buf_set_extmark(
-			buffer_handle,
-			M.cache.extmark_ns_id,
-			0,
-			0,
-			{
-				right_gravity = false, -- https://github.com/echasnovski/mini.nvim/issues/1642
-				virt_lines =
-					(
-						function()
-							local lines = {}
-							local line = {{"", "NonText"}}
-							for _ = 1, n do
-								table.insert(lines, line)
-							end
-							return lines
-						end
-					)(),
-				virt_lines_above = true,
-			}
-		)
+	vim.api.nvim_buf_set_extmark(
+		buf,
+		M.cache.extmark_ns_id,
+		0,
+		0,
+		{
+			right_gravity = false, -- https://github.com/nvim-mini/mini.nvim/issues/1642
+			virt_lines = lines,
+			virt_lines_above = true,
+		}
+	)
 end
 
-M.del_extmark = function(buffer_handle)
-	if buffer_handle == 0 then buffer_handle = vim.api.nvim_get_current_buf() end
-
-	if M.cache.extmark_id[buffer_handle] ~= nil then
-		vim.api.nvim_buf_del_extmark(
-			buffer_handle,
-			M.cache.extmark_ns_id,
-			M.cache.extmark_id[buffer_handle]
-		)
+M.buf_get_extmark = function(buf)
+	local extmarks = vim.api.nvim_buf_get_extmarks(
+		buf,
+		M.cache.extmark_ns_id,
+		{0, 0},
+		{0, 0},
+		{details = true}
+	)
+	if vim.tbl_isempty(extmarks) then
+		return nil
+	else
+		assert(#extmarks == 1)
+		return extmarks[1]
 	end
-
-	M.cache.extmark_id[buffer_handle] = nil
 end
 
-M.extmark_is_valid = function(buffer_handle, n)
-	if buffer_handle == 0 then buffer_handle = vim.api.nvim_get_current_buf() end
+M.buf_del_extmark = function(buf)
+	local extmark = M.buf_get_extmark(buf)
+	if extmark == nil then return end
 
-	if M.cache.extmark_id[buffer_handle] == nil then
-		return false
-	end
+	local id = extmark[1]
+	vim.api.nvim_buf_del_extmark(buf, M.cache.extmark_ns_id, id)
+end
 
-	local extmark_info =
-		vim.api.nvim_buf_get_extmark_by_id(
-			buffer_handle,
-			M.cache.extmark_ns_id,
-			M.cache.extmark_id[buffer_handle],
-			{
-				details = true,
-			}
-		)
-
-	if extmark_info[1] ~= 0 then
-		return false
-	end
-
-	if n ~= #extmark_info[3].virt_lines then
-		return false
-	end
-
+M.buf_is_extmark_valid = function(buf, n_lines)
+	local extmark = M.buf_get_extmark(buf)
+	if extmark == nil then return false end
+	if #extmark[4].virt_lines ~= n_lines then return false end
 	return true
 end
 
-M.update_extmark = function(buffer_handle, n)
-	if buffer_handle == 0 then buffer_handle = vim.api.nvim_get_current_buf() end
-
-	if
-		M.extmark_is_valid(buffer_handle, n)
-	then
-		return
+M.buf_ensure_extmark = function(buf, n_lines)
+	if M.buf_is_extmark_valid(buf, n_lines) then
+		-- do nothing
+	else
+		M.buf_del_extmark(buf)
+		M.buf_set_extmark(buf, n_lines)
 	end
-
-	M.del_extmark(buffer_handle)
-	M.create_extmark(buffer_handle, n)
 end
 
 M.create_autocmd = function()
 	vim.api.nvim_create_autocmd(
 		{
 			"BufEnter",
-			-- "TextChanged",
-			-- "TextChangedI",
+			"VimResized",
 		},
 		{
 			group = M.cache.augroup,
 			callback = function()
-				M.update_extmark(0, vim.o.lines)
+				M.buf_ensure_extmark(0, vim.o.lines)
+-- vim needs to keep the cursor visible,
+-- so the maximum number of virt_lines that can be shown is the window height minus one,
+-- the exact number does not matter
+-- we could use M.buf_ensure_extmark(0, 999) here,
+-- but vim.o.lines feels more elegant
 			end,
 		}
 	)
-end
-
-M.toggle_autocmd = function()
-	if
-		vim.tbl_isempty(
-			vim.api.nvim_get_autocmds({group = M.cache.augroup})
-		)
-	then
-		M.create_autocmd()
-		vim.api.nvim_exec_autocmds("BufEnter", {group = M.cache.augroup})
-	else
-		vim.api.nvim_clear_autocmds({group = M.cache.augroup})
-		for buffer_handle, _ in pairs(M.cache.extmark_id) do
-			M.del_extmark(buffer_handle)
-		end
-	end
 end
 
 -- # function: scroll
