@@ -236,20 +236,22 @@ M.scroll_count_ctrlu_space = function()
 end
 
 M.scroll_du_fix = function(n)
-	local should_fix = false
+-- at the end of the buffer, <c-d> scrolls until the last line becomes visible
+-- after that, it only moves the cursor and no longer scrolls
+-- we therefore calculate the owed space and use <c-e> to compensate
+	local owed_space = 0
 	if n > 0 then
 		local _, invisible_space = M.scroll_count_ctrld_space()
-		if invisible_space <= 0 then
-		-- in this situation, <c-d> only moves the cursor and does not scroll
-			should_fix = true
-		end
+		invisible_space = math.max(0, invisible_space)
+		owed_space = math.max(0, n - invisible_space)
 	end
 
 	M.scroll_du(n)
-	if should_fix then M.scroll_ey(n) end
+	M.scroll_ey(owed_space)
 end
 
 M.scroll = function(n)
+	n = math.modf(n)
 	if n == 0 then
 		return
 	elseif n > 0 then
