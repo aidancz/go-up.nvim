@@ -236,12 +236,38 @@ end
 
 -- # function: recenter
 
-M.recenter = function(winscreenrow_target)
-	winscreenrow_target = math.floor(winscreenrow_target)
-	winscreenrow_target = math.max(1, winscreenrow_target)
-	winscreenrow_target = math.min(vim.fn.winheight(0), winscreenrow_target)
-	local winscreenrow_current = vim.fn.winline()
-	M.scroll_ey(-(winscreenrow_target - winscreenrow_current))
+M.normalize_winline = function(winline)
+	winline = math.floor(winline)
+	winline = math.max(1, winline)
+	winline = math.min(vim.api.nvim_win_get_height(0), winline)
+	return winline
+end
+
+M.recenter = function(winline_target)
+	winline_target = M.normalize_winline(winline_target)
+	local winline_current = vim.fn.winline()
+	local winline_delta = winline_target - winline_current
+	M.scroll_ey(-winline_delta)
+end
+
+-- # function: setwinline
+
+M.cursor_gjgk = function(n)
+	if n == 0 then
+		return
+	elseif n > 0 then
+		vim.cmd("normal!" .. n .. "gj")
+	elseif n < 0 then
+		n = -n
+		vim.cmd("normal!" .. n .. "gk")
+	end
+end
+
+M.setwinline = function(winline_target)
+	winline_target = M.normalize_winline(winline_target)
+	local winline_current = vim.fn.winline()
+	local winline_delta = winline_target - winline_current
+	M.cursor_gjgk(winline_delta)
 end
 
 -- # used before
