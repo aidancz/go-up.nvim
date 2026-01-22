@@ -160,40 +160,42 @@ we need to modify it slightly
 --]]
 
 M.scroll_count_ctrld_space = function()
-	local pos11_cursor = require("virtcol").get_cursor()
-	local pos00 = {
-		pos11_cursor.lnum - 1,
-		pos11_cursor.virtcol - 1,
+	local pos_cursor = {
+		vim.fn.line(".") - 1,
+		vim.fn.virtcol(".") - 1,
 	}
-	local height_info = vim.api.nvim_win_text_height(
+	local height = vim.api.nvim_win_text_height(
 		0,
 		{
-			start_row = pos00[1],
-			start_vcol = pos00[2] + 1, -- exclusive
+			start_row = pos_cursor[1],
+			start_vcol = pos_cursor[2],
 		}
 	)
-	local height = height_info.all
-	local space = height - 1
+	local all = height.all
+	local fill = height.fill
+	local text = all - fill
+	local space = text - 1
 	local invisible_space = space - (vim.api.nvim_win_get_height(0) - vim.fn.winline())
 	return space, invisible_space
 end
 
 M.scroll_count_ctrlu_space = function()
-	local pos11_cursor = require("virtcol").get_cursor()
-	local pos00 = {
-		pos11_cursor.lnum - 1,
-		pos11_cursor.virtcol - 1,
+	local pos_cursor = {
+		vim.fn.line(".") - 1,
+		vim.fn.virtcol(".") - 1,
 	}
-	local height_info = vim.api.nvim_win_text_height(
+	local height = vim.api.nvim_win_text_height(
 		0,
 		{
-			end_row = pos00[1],
-			end_vcol = pos00[2] + 1, -- exclusive
+			end_row = pos_cursor[1],
+			end_vcol = pos_cursor[2],
 		}
 	)
-	local height_info_sob = vim.api.nvim_win_text_height(0, {end_row = 0, end_vcol = 0})
-	local height = height_info.all - height_info_sob.all
-	local space = height - 1
+	local all = height.all
+	if pos_cursor[2] == 0 then all = all + 1 end -- since end_vcol is exclusive
+	local fill = height.fill
+	local text = all - fill
+	local space = text - 1
 	local invisible_space = space - (vim.fn.winline() - 1)
 	return space, invisible_space
 end
