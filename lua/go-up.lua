@@ -174,9 +174,12 @@ M.scroll_count_ctrld_space = function()
 	local all = height.all
 	local fill = height.fill
 	local text = all - fill
-	local space = text - 1
-	local invisible_space = space - (vim.api.nvim_win_get_height(0) - vim.fn.winline())
-	return space, invisible_space
+
+	local space = {}
+	space.all = text - 1
+	space.visible = vim.api.nvim_win_get_height(0) - vim.fn.winline()
+	space.invisible = space.all - space.visible
+	return space
 end
 
 M.scroll_count_ctrlu_space = function()
@@ -195,9 +198,12 @@ M.scroll_count_ctrlu_space = function()
 	if pos_cursor[2] == 0 then all = all + 1 end -- since end_vcol is exclusive
 	local fill = height.fill
 	local text = all - fill
-	local space = text - 1
-	local invisible_space = space - (vim.fn.winline() - 1)
-	return space, invisible_space
+
+	local space = {}
+	space.all = text - 1
+	space.visible = vim.fn.winline() - 1
+	space.invisible = space.all - space.visible
+	return space
 end
 
 M.scroll_du_fix = function(n)
@@ -206,9 +212,11 @@ M.scroll_du_fix = function(n)
 -- we therefore calculate the owed space and use <c-e> to compensate
 	local owed_space = 0
 	if n > 0 then
-		local _, invisible_space = M.scroll_count_ctrld_space()
-		invisible_space = math.max(0, invisible_space)
-		owed_space = math.max(0, n - invisible_space)
+		local space = M.scroll_count_ctrld_space()
+		local invisible_space_that_ctrld_can_consume = math.max(0, space.invisible)
+		if n > invisible_space_that_ctrld_can_consume then
+			owed_space = n - invisible_space_that_ctrld_can_consume
+		end
 	end
 
 	M.scroll_du(n)
@@ -220,18 +228,18 @@ M.scroll = function(n)
 	if n == 0 then
 		return
 	elseif n > 0 then
-		local space, invisible_space = M.scroll_count_ctrld_space()
-		if math.abs(n) <= space then
+		local space = M.scroll_count_ctrld_space()
+		if math.abs(n) <= space.all then
 			M.scroll_du_fix(n)
 		else
-			M.scroll_ey(0 + invisible_space)
+			M.scroll_ey(space.invisible)
 		end
 	elseif n < 0 then
-		local space, invisible_space = M.scroll_count_ctrlu_space()
-		if math.abs(n) <= space then
+		local space = M.scroll_count_ctrlu_space()
+		if math.abs(n) <= space.all then
 			M.scroll_du_fix(n)
 		else
-			M.scroll_ey(0 - invisible_space)
+			M.scroll_ey(-space.invisible)
 		end
 	end
 end
