@@ -16,13 +16,23 @@ i want scrolling to be orthogonal to the cursor, but since the cursor must stay 
 
 https://github.com/neovim/neovim/issues/989
 
-before the off-screen cursor is implemented, i at least want the cursor position to remain unchanged after symmetric scrolling
+before the off-screen cursor is implemented, i at least want the cursor position to remain unchanged after scrolling
 
-that is, after pressing `<c-d>` and then `<c-u>`, the cursor should stay at its original **buffer** position, but this is not how the built-in behavior works
+that is:
+
+keep the cursor at the same window position whenever possible<br>
+if that is not possible (at the beginning/end of the buffer),<br>
+keep the cursor at the same buffer position and only scroll the window
+
+as a result:
+
+the cursor can always return to its original buffer position using scroll(n) and scroll(-n)<br>
+while still allowing the entire buffer to be viewed<br>
+this works around the lack of an off-screen cursor
+
+this plugin provides such function
 
 https://vi.stackexchange.com/questions/6005/scroll-without-changing-the-cursor-position
-
-this plugin provides a function so that after scroll(n) followed by scroll(-n), the cursor always returns to its original **buffer** location
 
 ## recenter
 

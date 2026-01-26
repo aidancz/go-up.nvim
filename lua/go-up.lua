@@ -142,6 +142,7 @@ end
 
 M.scroll_du = function(n)
 	assert(vim.wo.smoothscroll == true) -- can't set and restore, don't know why
+	assert(math.abs(n) <= vim.api.nvim_win_get_height(0)) -- <c-d>/<c-u> cannot scroll more than one window height
 	if n == 0 then
 		return
 	elseif n > 0 then
@@ -153,10 +154,15 @@ M.scroll_du = function(n)
 end
 
 --[[
-what i want to achieve is symmetrical scrolling
-which means that after scroll(n) and scroll(-n), the cursor should not move
-scroll_du is very close, but it fails at the beginning/end of the buffer
-we need to modify it slightly
+the desired scroll behavior is:
+keep the cursor at the same window position whenever possible
+if that is not possible (at the beginning/end of the buffer),
+keep the cursor at the same buffer position and only scroll the window
+
+as a result:
+the cursor can always return to its original buffer position using scroll(n) and scroll(-n)
+while still allowing the entire buffer to be viewed
+this works around the lack of an off-screen cursor
 --]]
 
 M.scroll_count_ctrld_space = function()
@@ -169,6 +175,11 @@ M.scroll_count_ctrld_space = function()
 		{
 			start_row = pos_cursor[1],
 			start_vcol = pos_cursor[2],
+			max_height = 2 * vim.o.lines,
+			-- max_height exists for speed, not as a logical constraint
+			-- for the result, imposing an upper bound does not affect the outcome
+			-- space.all can be replaced by math.min(winheight, space.all)
+			-- so we can limit max_height here
 		}
 	)
 	local all = height.all
@@ -192,6 +203,11 @@ M.scroll_count_ctrlu_space = function()
 		{
 			end_row = pos_cursor[1],
 			end_vcol = pos_cursor[2],
+			max_height = 2 * vim.o.lines,
+			-- max_height exists for speed, not as a logical constraint
+			-- for the result, imposing an upper bound does not affect the outcome
+			-- space.all can be replaced by math.min(winheight, space.all)
+			-- so we can limit max_height here
 		}
 	)
 	local all = height.all
