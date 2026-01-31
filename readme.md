@@ -46,6 +46,12 @@ https://github.com/neovim/neovim/issues/25392
 
 this plugin provides a recenter function that can place the current line at any position in the window
 
+# emacs, emacs, emacs!
+
+if vim has a plugin, emacs probably does too, and vice versa
+
+https://github.com/trevorpogue/topspace
+
 # limitation
 
 this plugin assumes only its own virtual lines are present, others may break the calculation
