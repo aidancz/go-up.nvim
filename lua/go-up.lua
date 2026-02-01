@@ -175,11 +175,16 @@ M.scroll_count_ctrld_space = function()
 		{
 			start_row = pos_cursor[1],
 			start_vcol = pos_cursor[2],
-			max_height = 2 * vim.o.lines,
+			max_height = (3 * vim.o.lines + 1),
 			-- max_height exists for speed, not as a logical constraint
 			-- for the result, imposing an upper bound does not affect the outcome
 			-- space.all can be replaced by math.min(winheight, space.all)
 			-- so we can limit max_height here
+			-- i.e.
+			-- (all - fill - 1) >= winheight -- `all` beyond this limit may be discarded
+			-- all >= (winheight + fill + 1)
+			-- all >= (2 * vim.o.lines + 1) -- since ((winheight <= vim.o.lines) and (fill == vim.o.lines))
+			-- all >= (3 * vim.o.lines + 1) -- relax the condition to allow other virtual lines
 		}
 	)
 	local all = height.all
@@ -203,11 +208,16 @@ M.scroll_count_ctrlu_space = function()
 		{
 			end_row = pos_cursor[1],
 			end_vcol = pos_cursor[2],
-			max_height = 2 * vim.o.lines,
+			max_height = (3 * vim.o.lines + 1),
 			-- max_height exists for speed, not as a logical constraint
 			-- for the result, imposing an upper bound does not affect the outcome
 			-- space.all can be replaced by math.min(winheight, space.all)
 			-- so we can limit max_height here
+			-- i.e.
+			-- (all - fill - 1) >= winheight -- `all` beyond this limit may be discarded
+			-- all >= (winheight + fill + 1)
+			-- all >= (2 * vim.o.lines + 1) -- since ((winheight <= vim.o.lines) and (fill == vim.o.lines))
+			-- all >= (3 * vim.o.lines + 1) -- relax the condition to allow other virtual lines
 		}
 	)
 	local all = height.all

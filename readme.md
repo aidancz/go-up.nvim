@@ -46,21 +46,7 @@ https://github.com/neovim/neovim/issues/25392
 
 this plugin provides a recenter function that can place the current line at any position in the window
 
-# emacs, emacs, emacs!
-
-if vim has a plugin, emacs probably does too, and vice versa
-
-https://github.com/trevorpogue/topspace
-
-# limitation
-
-this plugin assumes only its own virtual lines are present, others may break the calculation
-
-these issues should ideally be solved at the c level, this is only a hack
-
-https://github.com/neovim/neovim/issues/16166#issuecomment-1134656673
-
-i hope vim can natively support virtual lines above the first line, instead of simulating them with extmarks as this plugin does
+(the built-in `zz` command does not work with the virtual lines present at the beginning of the buffer)
 
 # example config
 
@@ -108,3 +94,21 @@ vim.keymap.set({"n", "x"}, "L", function() setwinline(height(1)) end)
 vim.keymap.set({"n", "x"}, "K", function() setwinline(height(0.25)) end)
 vim.keymap.set({"n", "x"}, "J", function() setwinline(height(0.75)) end)
 ```
+
+# limitation
+
+this plugin assumes only its own virtual lines are present, others may break the calculation
+
+but virtual lines that appear at the beginning/end of the buffer work correctly
+
+these issues should ideally be solved at the c level, this is only a hack
+
+https://github.com/neovim/neovim/issues/16166#issuecomment-1134656673
+
+i hope vim can natively support virtual lines above the first line, instead of simulating them with extmarks as this plugin does
+
+# emacs, emacs, emacs!
+
+if vim has a plugin, emacs probably does too, and vice versa
+
+https://github.com/trevorpogue/topspace
